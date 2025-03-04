@@ -29,17 +29,17 @@ class AttentionLayer(tf.keras.layers.Layer):
         return tf.reduce_sum(weighted, axis=1)
 
 # --- Load Models ---
-abnormality_model = tf.keras.models.load_model('/mnt/data/Abnormality_Cardiac.h5')
-single_model = tf.keras.models.load_model('/mnt/data/model_single.h5', custom_objects={'AttentionLayer': AttentionLayer})
-double_model = tf.keras.models.load_model('/mnt/data/model_double.h5', custom_objects={'AttentionLayer': AttentionLayer})
-multi_model = tf.keras.models.load_model('/mnt/data/model_multi.h5', custom_objects={'AttentionLayer': AttentionLayer})
+abnormality_model = tf.keras.models.load_model('Abnormality_Cardiac.h5')
+single_model = tf.keras.models.load_model('model_single.h5', custom_objects={'AttentionLayer': AttentionLayer})
+double_model = tf.keras.models.load_model('model_double.h5', custom_objects={'AttentionLayer': AttentionLayer})
+multi_model = tf.keras.models.load_model('model_multi.h5', custom_objects={'AttentionLayer': AttentionLayer})
 
 # --- Load Labels ---
-with open('/mnt/data/labels_single.pkl', 'rb') as f:
+with open('labels_single.pkl', 'rb') as f:
     labels_single = pickle.load(f)
-with open('/mnt/data/labels_double.pkl', 'rb') as f:
+with open('labels_double.pkl', 'rb') as f:
     labels_double = pickle.load(f)
-with open('/mnt/data/label_multi.npy', 'rb') as f:
+with open('label_multi.npy', 'rb') as f:
     labels_multi = np.load(f, allow_pickle=True)
 
 # --- Bandpass Filter Function ---
