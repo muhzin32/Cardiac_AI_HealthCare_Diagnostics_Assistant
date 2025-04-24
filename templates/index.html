@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECG Analysis</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script defer src="{{ url_for('static', filename='script/script.js') }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-dark">
+  <!-- Add the logo in the top-left corner -->
+  <img src="{{ url_for('static', filename='') }}" alt="Logo" style="position: fixed; top: 30px; left: 50px; width: 180px; height: 120px; z-index: 1000;">
+
+  <div class="container mt-5 text-center">
+    <!-- Center the title -->
+    <h2 class="text-light mb-4"> Cardiac Analyser</h2>
+    <div class="card shadow p-4">
+      <form id="uploadForm" method="POST" enctype="multipart/form-data" class="text-center">
+        <!-- File Upload -->
+        <input type="file" id="fileInput" name="files" class="form-control mb-3" accept=".mat,.dat,.hea,.atr" multiple>
+        <small class="text-muted">
+          For WFDB records, please upload the .mat files.
+        </small>
+        <br><br>
+        
+        <!-- Lead Selection Widget -->
+        <div id="leadSelectionContainer" class="mb-3 p-3 border rounded bg-light">
+          <h3 class="mb-3">Lead Selection Window</h3>
+          <div class="mb-3">
+            <label for="numLeadsSelect" class="form-label">Number of Leads:</label>
+            <select id="numLeadsSelect" class="form-select">
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">Default Combinations</option>
+            </select>
+          </div>
+          <div class="form-check mb-3">
+            <input type="checkbox" class="form-check-input" id="selectAllCheckbox">
+            <label class="form-check-label" for="selectAllCheckbox">Select All Leads</label>
+          </div>
+          <div id="manualLeadsBox" class="mb-3">
+            <!-- Dynamic dropdowns will appear here -->
+          </div>
+          <!-- Hidden input to store the JSON-encoded selected leads -->
+          <input type="hidden" name="selected_leads" id="selectedLeadsInput">
+          <input type="hidden" name="analysis_type" id="analysisTypeInput">
+        </div>
+        
+        <!-- Default Combination Information -->
+        <div class="mb-3 p-3 border rounded bg-light">
+          <h4 class="mb-3">Default Combinations Reference</h4>
+          <p class="text-muted">Refer to the table below for default combinations of diseases and their corresponding leads. Use the disease key (e.g., <strong>MI</strong>, <strong>LVQRSAL</strong>) when selecting "Default Combinations".</p>
+          <button class="btn btn-info mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#defaultCombinationsTable" aria-expanded="false" aria-controls="defaultCombinationsTable">
+            Show/Hide Default Combinations
+          </button>
+          <div class="collapse" id="defaultCombinationsTable">
+            <table class="table table-bordered table-striped">
+              <thead>
+                <tr>
+                  <th>Disease Key</th>
+                  <th>Lead Combinations</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>MI</td>
+                  <td>I, II, III, V1, V2, V3, V4, V5, V6, aVF, aVL</td>
+                </tr>
+                <tr>
+                  <td>LVQRSAL</td>
+                  <td>I, II, III, V1, V2, V3, V4, V5, V6, aVF, aVL, aVR</td>
+                </tr>
+                <tr>
+                  <td>LVQRSLL</td>
+                  <td>I, II, III, aVF, aVL, aVR</td>
+                </tr>
+                <tr>
+                  <td>ALS_ARS</td>
+                  <td>I, II, aVF</td>
+                </tr>
+                <tr>
+                  <td>MISW</td>
+                  <td>I, V5, V6, aVL</td>
+                </tr>
+                <tr>
+                  <td>MILW</td>
+                  <td>II, III, aVF</td>
+                </tr>
+                <tr>
+                  <td>AVB_Group</td>
+                  <td>II, V1</td>
+                </tr>
+                <tr>
+                  <td>PRIE_QTIE</td>
+                  <td>II, V2, V3, V4, V5, V6</td>
+                </tr>
+                <tr>
+                  <td>AQW</td>
+                  <td>III, V1, V2, V3, V4, aVF</td>
+                </tr>
+                <tr>
+                  <td>MIBW_RVH</td>
+                  <td>V1, V2</td>
+                </tr>
+                <tr>
+                  <td>FQRS</td>
+                  <td>V1, V2, V3</td>
+                </tr>
+                <tr>
+                  <td>MIFW_Group</td>
+                  <td>V1, V2, V3, V4</td>
+                </tr>
+                <tr>
+                  <td>IVB_Group</td>
+                  <td>V1, V2, V3, V4, V5, V6</td>
+                </tr>
+                <tr>
+                  <td>LBBB_Group</td>
+                  <td>V1, V6</td>
+                </tr>
+                <tr>
+                  <td>UW</td>
+                  <td>V2, V3</td>
+                </tr>
+                <tr>
+                  <td>ST_Group</td>
+                  <td>V2, V3, V4, V5, V6</td>
+                </tr>
+                <tr>
+                  <td>LVH</td>
+                  <td>V5, V6, aVL</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Default Combination Selection -->
+        <div id="defaultCombinationSection" class="mb-3 p-3 border rounded bg-light d-none">
+          <h4 class="mb-3">Select Default Combination</h4>
+          <label for="defaultCombinationSelect" class="form-label">Choose a Disease Key:</label>
+          <select id="defaultCombinationSelect" class="form-select">
+            <option value="">-- Select a Disease Key --</option>
+            <option value="MI">MI</option>
+            <option value="LVQRSAL">LVQRSAL</option>
+            <option value="LVQRSLL">LVQRSLL</option>
+            <option value="ALS_ARS">ALS_ARS</option>
+            <option value="MISW">MISW</option>
+            <option value="MILW">MILW</option>
+            <option value="AVB_Group">AVB_Group</option>
+            <option value="PRIE_QTIE">PRIE_QTIE</option>
+            <option value="AQW">AQW</option>
+            <option value="MIBW_RVH">MIBW_RVH</option>
+            <option value="FQRS">FQRS</option>
+            <option value="MIFW_Group">MIFW_Group</option>
+            <option value="IVB_Group">IVB_Group</option>
+            <option value="LBBB_Group">LBBB_Group</option>
+            <option value="UW">UW</option>
+            <option value="ST_Group">ST_Group</option>
+            <option value="LVH">LVH</option>
+          </select>
+        </div>
+        
+        <button type="submit" class="btn btn-warning mt-2">Start Analysis</button>
+      </form>
+      
+      <div id="loading" class="text-center mt-3 d-none">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p>Processing ECG data...</p>
+      </div>
+    </div>
+    
+    <!-- ECG Plot -->
+    <div id="ecgPlotContainer" class="mt-4 d-none">
+      <h4 class="text-light">ECG Plot</h4>
+      <img id="ecgImage" src="" alt="ECG Plot" class="img-fluid">
+    </div>
+    
+    <!-- Results Section -->
+    <div id="resultContainer" class="mt-4 d-none">
+      <h4 class="text-light">Results</h4>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Segment</th>
+            <th>Prediction</th>
+            <th>Confidence</th>
+          </tr>
+        </thead>
+        <tbody id="resultTable"></tbody>
+        <tfoot>
+          <tr class="table-info" id="finalDiseaseRow">
+            <td colspan="3" class="text-center">
+              <strong id="finalDisease"></strong>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="text-center mt-4">
+        <button id="generateReportBtn" class="btn btn-success d-none">Generate Report</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Bootstrap Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Define the lead options (mimicking the ipywidgets choices) and ensure they are correctly populated
+    const leadOptions = [
+      { label: "I (0)", value: 0 },
+      { label: "II (1)", value: 1 },
+      { label: "III (2)", value: 2 },
+      { label: "aVR (3)", value: 3 },
+      { label: "aVL (4)", value: 4 },
+      { label: "aVF (5)", value: 5 },
+      { label: "V1 (6)", value: 6 },
+      { label: "V2 (7)", value: 7 },
+      { label: "V3 (8)", value: 8 },
+      { label: "V4 (9)", value: 9 },
+      { label: "V5 (10)", value: 10 },
+      { label: "V6 (11)", value: 11 }
+    ];
+    
+    const numLeadsSelect = document.getElementById("numLeadsSelect");
+    const selectAllCheckbox = document.getElementById("selectAllCheckbox");
+    const manualLeadsBox = document.getElementById("manualLeadsBox");
+    const selectedLeadsInput = document.getElementById("selectedLeadsInput");
+    const analysisType = document.getElementById("analysisType");
+    const analysisTypeInput = document.getElementById("analysisTypeInput");
+
+    // Define the mapping of default combinations to leads and diseases
+    const defaultCombinations = {
+      MI: ['I', 'II', 'III', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'aVF', 'aVL'],
+      LVQRSAL: ['I', 'II', 'III', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'aVF', 'aVL', 'aVR'],
+      LVQRSLL: ['I', 'II', 'III', 'aVF', 'aVL', 'aVR'],
+      ALS_ARS: ['I', 'II', 'aVF'],
+      MISW: ['I', 'V5', 'V6', 'aVL'],
+      MILW: ['II', 'III', 'aVF'],
+      AVB_Group: ['II', 'V1'],
+      PRIE_QTIE: ['II', 'V2', 'V3', 'V4', 'V5', 'V6'],
+      AQW: ['III', 'V1', 'V2', 'V3', 'V4', 'aVF'],
+      MIBW_RVH: ['V1', 'V2'],
+      FQRS: ['V1', 'V2', 'V3'],
+      MIFW_Group: ['V1', 'V2', 'V3', 'V4'],
+      IVB_Group: ['V1', 'V2', 'V3', 'V4', 'V5', 'V6'],
+      LBBB_Group: ['V1', 'V6'],
+      UW: ['V2', 'V3'],
+      ST_Group: ['V2', 'V3', 'V4', 'V5', 'V6'],
+      LVH: ['V5', 'V6', 'aVL']
+    };
+
+    // Function to create a dropdown for lead selection
+    function createDropdown(id) {
+      const select = document.createElement("select");
+      select.className = "form-select mb-2";
+      select.id = id;
+      leadOptions.forEach(option => {
+        const opt = document.createElement("option");
+        opt.value = option.value;
+        opt.textContent = option.label;
+        select.appendChild(opt);
+      });
+      return select;
+    }
+
+    // Function to update dropdowns for default combinations
+    function updateDefaultCombinations() {
+      manualLeadsBox.innerHTML = ""; // Clear existing dropdowns
+      const selectedDisease = prompt("Enter the disease key (e.g., MI, LVQRSAL):");
+      const leads = defaultCombinations[selectedDisease];
+
+      if (leads) {
+        leads.forEach((lead) => {
+          const dropdown = createDropdown("leadDropdown" + lead);
+          dropdown.value = leadOptions.find(option => option.label.startsWith(lead)).value;
+          manualLeadsBox.appendChild(dropdown);
+        });
+      } else {
+        alert("Invalid disease key. Please try again.");
+      }
+    }
+
+    // Update the manual dropdowns based on the number of leads selected
+    function updateManualDropdowns() {
+      manualLeadsBox.innerHTML = "";
+      const num = parseInt(numLeadsSelect.value);
+      for (let i = 0; i < num; i++) {
+        const dropdown = createDropdown("leadDropdown" + i);
+        manualLeadsBox.appendChild(dropdown);
+      }
+    }
+
+    // Initial dropdown creation
+    updateManualDropdowns();
+
+    numLeadsSelect.addEventListener("change", function () {
+      if (numLeadsSelect.value === "5") {
+        updateDefaultCombinations();
+      } else {
+        updateManualDropdowns();
+      }
+    });
+
+    // When "Select All Leads" is checked, show a message and skip manual selection
+    selectAllCheckbox.addEventListener("change", function() {
+      if (this.checked) {
+        manualLeadsBox.innerHTML = "<p class='mb-0'>All leads will be selected.</p>";
+      } else {
+        updateManualDropdowns();
+      }
+    });
+
+    // Before form submission, collect the selected leads and store them as JSON
+    const uploadForm = document.getElementById("uploadForm");
+    uploadForm.addEventListener("submit", function (e) {
+      let selectedLeads;
+      if (selectAllCheckbox.checked) {
+        // Select all 12 leads
+        selectedLeads = Array.from({ length: 12 }, (_, i) => i);
+      } else {
+        const dropdowns = manualLeadsBox.querySelectorAll("select");
+        selectedLeads = Array.from(dropdowns).map((select) => parseInt(select.value));
+      }
+
+      // Ensure selectedLeads is not empty
+      if (!selectedLeads || selectedLeads.length === 0) {
+        e.preventDefault(); // Prevent form submission
+        alert("Please select at least one lead for analysis.");
+        return;
+      }
+
+      selectedLeadsInput.value = JSON.stringify(selectedLeads);
+      analysisTypeInput.value = analysisType.value;
+    });
+
+    const loading = document.getElementById("loading");
+    const ecgPlotContainer = document.getElementById("ecgPlotContainer");
+    const resultContainer = document.getElementById("resultContainer");
+
+    uploadForm.addEventListener("submit", function (e) {
+      e.preventDefault(); // Prevent form submission for demonstration purposes
+
+      // Show the loading spinner
+      loading.classList.remove("d-none");
+
+      // Simulate a delay for analysis (e.g., server processing)
+      setTimeout(() => {
+        // Hide the loading spinner
+        loading.classList.add("d-none");
+
+        // Show the ECG plot and results section
+        ecgPlotContainer.classList.remove("d-none");
+        resultContainer.classList.remove("d-none");
+      }, 20); 
+    });
+  </script>
+</body>
+</html>
+``` 
